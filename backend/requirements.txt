@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-multipart
+datasets
+docker
+openai
+requests
+pydantic
+dotenv
