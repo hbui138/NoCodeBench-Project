@@ -3,6 +3,10 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+all_preds.jsonl
+all_preds_summary_report.txt
+evaluation/logs/*
+
 # C extensions
 *.so
 

@@ -14,7 +14,7 @@ This guide summarizes the essential steps required to set up the project environ
 Clone the official benchmark repository into a dedicated folder so your own backend/frontend remain clean:
 
 ```bash
-git clone https://github.com/NoCode-bench/NoCode-bench.git bench_core
+git clone https://github.com/hbui138/NoCode-bench.git bench-core
 ```
 
 Folder layout after this step:
