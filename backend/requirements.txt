@@ -7,4 +7,4 @@ openai
 requests
 pydantic
 dotenv
-google
+google-genai
