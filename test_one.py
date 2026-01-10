@@ -45,7 +45,7 @@ def test_first_task():
         run_resp = requests.post(
             f"{BASE_URL}/run", 
             json={"instance_id": instance_id},
-            timeout=600 
+            timeout=6000 
         )
 
         duration = time.time() - start_time

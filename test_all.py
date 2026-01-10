@@ -6,7 +6,7 @@ import sys
 BASE_URL = "http://localhost:8000"
 
 def draw_progress_bar(current, total, bar_length=40):
-    """Hàm vẽ thanh tiến trình trên terminal"""
+    """Function to draw a progress bar in the console."""
     if total == 0:
         percent = 0
         arrow = '-' * bar_length
@@ -39,48 +39,48 @@ def monitor_batch():
         print("❌ Cannot connect to backend. Is 'python main.py' running?")
         return
 
-    print("👀 Monitoring progress... (Press Ctrl+C to exit monitor, background task will continue)\n")
+    # print("👀 Monitoring progress... (Press Ctrl+C to exit monitor, background task will continue)\n")
 
     # 2. Vòng lặp MONITORING
-    try:
-        while True:
-            try:
-                status_resp = requests.get(f"{BASE_URL}/batch/status")
-                if status_resp.status_code != 200:
-                    break
+    # try:
+    #     while True:
+    #         try:
+    #             status_resp = requests.get(f"{BASE_URL}/batch/status")
+    #             if status_resp.status_code != 200:
+    #                 break
                 
-                data = status_resp.json()
+    #             data = status_resp.json()
                 
-                is_running = data['is_running']
-                processed = data['processed']
-                total = data['total']
-                logs = data['logs']
+    #             is_running = data['is_running']
+    #             processed = data['processed']
+    #             total = data['total']
+    #             logs = data['logs']
 
-                # Vẽ thanh tiến trình
-                draw_progress_bar(processed, total)
+    #             # Vẽ thanh tiến trình
+    #             draw_progress_bar(processed, total)
 
-                # In log mới nhất (nếu có thay đổi)
-                if logs:
-                    # Di chuyển con trỏ xuống dòng dưới để in log, rồi lại quay về vẽ bar
-                    # (Để đơn giản, ta chỉ in log cuối cùng bên cạnh status)
-                    sys.stdout.write(f" | Last: {logs[-1]}")
+    #             # In log mới nhất (nếu có thay đổi)
+    #             if logs:
+    #                 # Di chuyển con trỏ xuống dòng dưới để in log, rồi lại quay về vẽ bar
+    #                 # (Để đơn giản, ta chỉ in log cuối cùng bên cạnh status)
+    #                 sys.stdout.write(f" | Last: {logs[-1]}")
 
-                # Kiểm tra điều kiện dừng
-                if not is_running:
-                    if processed >= total and total > 0:
-                        print("\n\n🎉 BATCH COMPLETED! All tasks finished.")
-                    else:
-                        print("\n\n⏹️  Batch stopped by user or finished.")
-                    break
+    #             # Kiểm tra điều kiện dừng
+    #             if not is_running:
+    #                 if processed >= total and total > 0:
+    #                     print("\n\n🎉 BATCH COMPLETED! All tasks finished.")
+    #                 else:
+    #                     print("\n\n⏹️  Batch stopped by user or finished.")
+    #                 break
 
-                time.sleep(1) # Cập nhật mỗi 1 giây
+    #             time.sleep(1) # Cập nhật mỗi 1 giây
 
-            except Exception as e:
-                print(f"\n❌ Monitoring Error: {e}")
-                break
+    #         except Exception as e:
+    #             print(f"\n❌ Monitoring Error: {e}")
+    #             break
 
-    except KeyboardInterrupt:
-        print("\n\n👋 Stopped monitoring.")
+    # except KeyboardInterrupt:
+    #     print("\n\n👋 Stopped monitoring.")
 
 def stop_batch():
     """Hàm phụ trợ để dừng khẩn cấp"""

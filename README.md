@@ -137,7 +137,38 @@ Run the backend server
 python ./backend/main.py
 ```
 
-Run the test
+Run the test (one instance or all instances)
+If one, change the desired task number inside test_one.py and run (Line 27:         target_task = tasks[0])
 ```bash
-python test_backend.py
+python test_one.py
+python test_all.py
 ```
+
+Folder structure full
+```bash
+nocode-agent
+  .github/workflows/
+  backend
+    agent.py
+    main.py
+    requirements.txt
+    schemas.py
+    state.py
+    utils.py
+    service.py
+  bench-core (folder you clone the nocodebench repo)
+    requirements.txt (modules used by bench-core)
+    repos
+    evaluation
+  frondend
+  results (What you get after running the tests)
+    results_timestamp
+      evaluation_logs
+      all_preds.jsonl
+      summary_report.txt
+  .env (You created)
+  test_all.py
+  test_one.py
+```
+
+
