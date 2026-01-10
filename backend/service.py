@@ -254,7 +254,6 @@ def run_final_aggregation_and_cleanup():
         with open(predictions_path, "r") as f:
             for line in f:
                 try:
-                    print("Been here at least for token usage")
                     d = json.loads(line)
                     token_data_map[d['instance_id']] = d.get("token_usage", {})
                 except: continue

@@ -129,15 +129,6 @@ class NoCodeAgent:
                 - If you define a new Exception, ensure it inherits from an appropriate base 
                 class already used in the project to maintain backwards compatibility.
 
-            FORMAT:
-            <<<< SEARCH
-            old_code_line_1
-            old_code_line_2
-            ====
-            new_code_line_1
-            new_code_line_2
-            >>>>
-
             RULES:
             1. 🔍 EXACT MATCH REQUIRED: The content of the <<<< SEARCH block must be a byte-for-byte copy of the original file.
                - ⛔️ NO REFORMATTING: Do not fix indentation, remove spaces, or change quotes (' vs ").
@@ -163,6 +154,24 @@ class NoCodeAgent:
                - EXAMPLE: 
                  (Bad):  @decorator(names=["new_arg"]) -> def func(old_arg):
                  (Good): @decorator(names=["new_arg"]) -> def func(old_arg, new_arg=None):
+            
+            🚨 STRICT FORMATTING RULES (CRITICAL):
+            - DO NOT include `python` or markdown fences (```) inside the blocks.
+            - DO NOT abbreviate logic with comments like `# ... existing code ...`. WRITE IT OUT.
+            - DO NOT ADD LABELS like 'REPLACE', 'UPDATE', 'CODE', or 'INSERT' inside the blocks. JUST WRITE THE CODE.
+            - INDENTATION MATTERS: Ensure your `<<<< SEARCH` block has the EXACT indentation as the original file.
+            - If matching fails, I will reject your answer. Use enough context (3-4 lines) to make the match unique.
+            
+            FORMAT EXAMPLE:
+            <<<< SEARCH
+                def calculate_sum(a, b):
+                    # old comment
+                    return a + b
+            ====
+                def calculate_sum(a, b):
+                    # fixed comment
+                    return a + b + c
+            >>>>
             """
 
             # --- RETRY LOOP ---
@@ -226,17 +235,34 @@ class NoCodeAgent:
         try:
             if not ai_output or not isinstance(ai_output, str): return ""
 
-            pattern = r"<<<< SEARCH\n(.*?)\n====\n(.*?)\n>>>>"
-            matches = re.findall(pattern, ai_output, re.DOTALL)
+            # --- FIX 1: Dọn dẹp Markdown Artifacts ---
+            # Gemini hay trả về ```python ở đầu và ``` ở cuối, làm hỏng regex
+            clean_output = re.sub(r"^```[a-zA-Z]*\n", "", ai_output.strip())
+            clean_output = re.sub(r"\n```$", "", clean_output)
             
-            if not matches: return ""
+            # --- FIX 2: Regex linh hoạt hơn ---
+            # Cho phép có hoặc không có newline trước/sau các thẻ
+            pattern = r"<{4}\s*SEARCH\s*\n(.*?)\n={4}\s*\n(.*?)\n>{4}"
+            matches = re.findall(pattern, clean_output, re.DOTALL)
+            
+            if not matches: 
+                # Fallback: Thử tìm pattern không có newline (trường hợp LLM viết liền)
+                pattern_lazy = r"<{4}\s*SEARCH\n(.*?)\n={4}\n(.*?)\n>{4}"
+                matches = re.findall(pattern_lazy, clean_output, re.DOTALL)
+                if not matches: return ""
 
             original_lines = original_code.splitlines(keepends=True)
             modified_lines = original_lines[:] 
             
-            # Function to super normalize strings for comparison (ignore all whitespace and case)
+            # --- FIX 3: Super Normalize thông minh hơn ---
             def super_normalize(s):
-                return re.sub(r'\s+', '', s).lower()
+                # 1. Xóa hết whitespace
+                s = re.sub(r'\s+', '', s).lower()
+                # 2. Chuẩn hóa dấu nháy: Biến tất cả ' thành " để so sánh
+                s = s.replace("'", '"')
+                # 3. Bỏ qua trailing commas (dấu phẩy cuối) hay gây lỗi
+                s = s.replace(",)", ")").replace(",]", "]").replace(",}", "}")
+                return s
 
             changes_to_apply = []
 
@@ -244,11 +270,7 @@ class NoCodeAgent:
                 search_lines = search_block.strip().splitlines()
                 if not search_lines: continue
 
-                # WARNING for short blocks
-                if len(search_lines) < 2:
-                    print(f"  ⚠️ Warning: Search block #{i+1} is too short ({len(search_lines)} line). High risk of ambiguity.")
-
-                # Prepare normalized search string
+                # Normalized search block
                 search_chunk_str = "\n".join(search_lines)
                 search_norm = super_normalize(search_chunk_str)
                 n_search = len(search_lines)
@@ -256,83 +278,68 @@ class NoCodeAgent:
                 best_ratio = 0.0
                 best_idx = -1
                 
-                # --- SLIDING WINDOW SEARCH ---
-                # Scan each window of size n_search in the original file
-                # Allow window to expand/shrink +/- 2 lines to compensate for AI missing/extra blank lines
+                # --- Sliding Window ---
+                # Mẹo: Giảm phạm vi search nếu file quá lớn để tiết kiệm CPU
+                search_limit = len(original_lines)
                 
-                candidates_range = [0, -1, 1] # Check exact size, then size-1, then size+1
-                
-                found_match = False
-                
-                # 1. Try Exact Sliding Window first (fast)
                 for idx in range(len(original_lines) - n_search + 1):
-                    chunk = original_lines[idx : idx + n_search]
-                    chunk_str = "".join([l.strip() for l in chunk]) # Strip basic
+                    # Lấy chunk từ file gốc
+                    chunk_lines = original_lines[idx : idx + n_search]
+                    chunk_str = "".join([l.strip() for l in chunk_lines]) # Strip basic
+                    
+                    # 1. Check Exact Match (nhanh)
                     search_basic = "".join([l.strip() for l in search_lines])
                     if chunk_str == search_basic:
                         best_idx = idx
                         best_ratio = 1.0
-                        found_match = True
-                        break
+                        break # Tìm thấy tuyệt đối thì dừng luôn
 
-                # 2. If not found, try fuzzy matching with slight size variations
-                if not found_match:
-                    # Limit search range to improve speed for large files (Optional)
-                    for idx in range(len(original_lines) - n_search + 1):
-                        # Lấy chunk từ file gốc
-                        chunk_lines = original_lines[idx : idx + n_search]
-                        chunk_str = "\n".join([l.strip() for l in chunk_lines])
-                        
-                        # Compute similarity
-                        ratio = difflib.SequenceMatcher(None, 
-                                                        super_normalize(chunk_str), 
-                                                        search_norm).ratio()
-                        
-                        if ratio > best_ratio:
-                            best_ratio = ratio
-                            best_idx = idx
-                            
-                            # If very high similarity, break early
-                            if ratio > 0.95: break
+                    # 2. Check Fuzzy Match (chậm hơn nhưng cứu cánh)
+                    # Chỉ check fuzzy nếu độ dài chunk tương đương
+                    chunk_norm = super_normalize("\n".join(chunk_lines))
+                    
+                    # Dùng ratio của difflib
+                    ratio = difflib.SequenceMatcher(None, chunk_norm, search_norm).ratio()
+                    
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_idx = idx
+                        if ratio > 0.98: break # Đủ tốt thì dừng
 
-                # Threshold for acceptance
-                THRESHOLD = 0.80 
+                # --- FIX 4: Giảm Threshold xuống mức chấp nhận được ---
+                # 0.8 là hơi cao với NoCode-bench, 0.75 là mức an toàn cho các lỗi thụt dòng
+                THRESHOLD = 0.75 
                 
                 if best_ratio >= THRESHOLD:
-                    print(f"  ✅ Block #{i+1} located at line {best_idx+1} (Similarity: {best_ratio:.2f})")
-                    
+                    print(f"  ✅ Apply Block #{i+1} at line {best_idx+1} (Conf: {best_ratio:.2f})")
                     changes_to_apply.append({
                         "start": best_idx,
                         "end": best_idx + n_search,
                         "replace": replace_block
                     })
                 else:
-                    print(f"  ❌ Failed to locate Block #{i+1} in {filename}")
-                    print(f"     🔻 AI SEARCH (First line): {search_lines[0].strip()}")
-                    if best_idx != -1:
-                        print(f"     🔺 BEST GUESS (Line {best_idx+1}, Sim: {best_ratio:.2f}): {original_lines[best_idx].strip()}")
-                    else:
-                        print(f"     🔺 No candidate found.")
-                    return "" # Fail safe
+                    print(f"  ❌ Failed Block #{i+1} (Best conf: {best_ratio:.2f})")
+                    # Log ra để debug xem nó lệch ở đâu
+                    return ""
 
-            # Apply changes in reverse order to avoid messing up line indices
+            # Apply changes (từ dưới lên trên để không lệch index)
             changes_to_apply.sort(key=lambda x: x["start"], reverse=True)
 
             for change in changes_to_apply:
                 start = change["start"]
                 end = change["end"]
                 r_block = change["replace"]
-
+                
+                # Xử lý indentation cho block thay thế
+                # (Tự động thêm \n nếu thiếu)
+                r_lines = [line + '\n' if not line.endswith('\n') else line for line in r_block.splitlines()]
+                
+                # Xóa code cũ và chèn code mới
                 del modified_lines[start:end]
-                
-                # Automatically handle indentation for replace block (Optional - advanced feature)
-                # Here we assume AI has correctly indented in the replace block
-                r_lines = r_block.splitlines(keepends=True)
-                cleaned_replace = [l if l.endswith('\n') else l + '\n' for l in r_lines]
-                
-                for l in reversed(cleaned_replace):
+                for l in reversed(r_lines):
                     modified_lines.insert(start, l)
 
+            # Tạo diff
             final_code_str = "".join(modified_lines)
             diff = difflib.unified_diff(
                 original_code.splitlines(keepends=True),
@@ -343,5 +350,5 @@ class NoCodeAgent:
             return "".join(diff)
 
         except Exception as e:
-            print(f"❌ Error in robust diff: {e}")
+            print(f"❌ Critical Diff Error: {e}")
             return ""

@@ -10,17 +10,48 @@ import state
 import schemas
 import service 
 
-# --- LIFESPAN ---
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# --- HELPER: Load tasks ---
+# --- 1. LIFESPAN (Khởi tạo dữ liệu khi Server bật) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("⏳ Loading Dataset...")
-    ds = load_dataset('NoCode-bench/NoCode-bench_Verified', split='test')
-    state.data_map = {item['instance_id']: item for item in ds}
-    print(f"✅ Loaded {len(state.data_map)} tasks.")
-    yield
+    print("\n⏳ [STARTUP] Downloading & Loading Dataset from Hugging Face...")
+    try:
+        ds = load_dataset('NoCode-bench/NoCode-bench_Verified', split='test')
+        
+        state.data_map = {}
+        count = 0
+        for item in ds:
+            # Chuyển row thành dict
+            t = dict(item)
+            
+            t_id = t.get('instance_id')
+            if t_id:
+                t['id'] = t_id
+                state.data_map[t_id] = t
+                count += 1
+                
+        print(f"✅ [STARTUP] Successfully loaded {count} tasks into memory.")
+        
+    except Exception as e:
+        print(f"❌ [STARTUP ERROR] Could not load dataset: {e}")
+        # (Tùy chọn) Load fallback từ file local nếu cần
+    
+    yield  # Server chạy tại điểm này
+    
+    print("🛑 [SHUTDOWN] Cleaning up resources...")
+    state.data_map.clear()
 
+# --- 2. APP CONFIGURATION ---
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_methods=["*"], 
+    allow_headers=["*"]
+)
 
 # --- API ROUTES ---
 
@@ -91,37 +122,63 @@ def run_single(req: schemas.RunRequest):
 
     # Gọi logic từ service
     result = service.run_task_logic(req.instance_id, is_batch_mode=False)
-    
     return result
 
 # ==========================================
 # 2. Run BATCH API (ASYNC)
 # ==========================================
 @app.post("/batch/start")
-def start_batch(background_tasks: BackgroundTasks):
+def start_batch(req: schemas.BatchStartRequest, background_tasks: BackgroundTasks):
     service.initialize_paths(force_new=True)
 
     if state.batch_state.is_running:
         raise HTTPException(400, "Batch is already running")
-    
-    all_ids = list(state.data_map.keys())
-    background_tasks.add_task(service.run_batch_process, all_ids)
-    return {"message": f"Started batch for {len(all_ids)} tasks"}
+    # Logic lọc số lượng
 
-@app.get("/batch/status")
+    if req.ids and len(req.ids) > 0:
+        target_ids = req.ids
+        print(f"🎯 [MODE: SELECTED] Running {len(target_ids)} tasks provided by Client.")
+    elif req.limit > 0:
+        all_ids = list(state.data_map.keys())
+        target_ids = all_ids[:req.limit]
+        print(f"✂️ [MODE: LIMIT] Running first {req.limit} tasks.")
+    else:
+        target_ids = list(state.data_map.keys())
+        print(f"🚀 [MODE: FULL] Running ALL {len(target_ids)} tasks.")
+
+    if not target_ids:
+        raise HTTPException(400, "No tasks found to run.")
+
+    background_tasks.add_task(service.run_batch_process, target_ids)
+    return {
+        "status": "success", 
+        "message": f"Started batch for {len(target_ids)} tasks",
+        "count": len(target_ids)
+    }
+
+@app.get("/batch/status", response_model=schemas.BatchStatusResponse)
 def get_batch_status():
+    """Client calls this endpoint periodically to get batch status."""
     s = state.batch_state
+
+    percent = 0.0
+    if s.total_tasks > 0:
+        percent = (s.processed_count / s.total_tasks) * 100
+
     return {
         "is_running": s.is_running,
         "processed": s.processed_count,
         "total": s.total_tasks,
-        "logs": s.logs[-10:]
+        "current_task": None,
+        "progress_percent": round(percent, 2),
+        "latest_logs": s.logs[-10:] if hasattr(s, 'logs') else [], # Lấy 10 log cuối
+        "results_summary": s.results if hasattr(s, 'results') else [] # Lấy danh sách kết quả
     }
 
 @app.post("/batch/stop")
 def stop_batch():
     state.batch_state.stop()
-    return {"message": "Stopping..."}
+    return {"message": "Stop signal sent (not fully implemented)"}
 
 def load_results_from_file():
     results = {}
