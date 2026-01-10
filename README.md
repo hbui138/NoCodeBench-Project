@@ -91,7 +91,7 @@ docker compose version
 Move into the environment directory inside the benchmark core:
 
 ```bash
-cd bench_core/environment
+cd bench-core/environment
 ```
 
 Pull repository-level images using the provided script:
@@ -102,7 +102,12 @@ bash ./pull_from_hub.sh
 
 This downloads all base Docker images required for running the benchmark tasks.
 
-### **2.3 Verify Dataset Availability**
+### **2.3 Clone repo**
+```bash
+cd bench-core/repos
+bash ./collect.sh
+```
+### **2.4 Verify Dataset Availability**
 
 Use the built‑in script to check whether datasets are correctly downloaded:
 
