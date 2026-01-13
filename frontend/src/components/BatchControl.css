@@ -1,0 +1,115 @@
+.batch-control {
+  padding: 1.5rem;
+  border-bottom: 1px solid #e0e0e0;
+  background: white;
+}
+
+.batch-control h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.batch-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 24px;
+  background: #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #666;
+  text-align: center;
+}
+
+.batch-idle {
+  padding: 0.5rem;
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.start-button,
+.stop-button {
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.start-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.start-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.stop-button {
+  background: #ff5252;
+  color: white;
+}
+
+.stop-button:hover {
+  opacity: 0.9;
+}
+
+.batch-logs {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.batch-logs h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: #666;
+}
+
+.log-content {
+  background: #f5f5f5;
+  border-radius: 4px;
+  padding: 0.5rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  font-size: 0.8rem;
+  font-family: monospace;
+  padding: 0.25rem 0;
+  color: #333;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+
+
+
