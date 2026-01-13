@@ -7,52 +7,52 @@ import argparse
 # Configuration
 BASE_URL = "http://localhost:8000"
 
-def draw_progress_bar(current, total, bar_length=40):
-    if total == 0: total = 1 # Tránh chia cho 0
-    percent = float(current) / total
-    arrow = '-' * int(round(percent * bar_length) - 1) + '>'
-    spaces = ' ' * (bar_length - len(arrow))
+# def draw_progress_bar(current, total, bar_length=40):
+#     if total == 0: total = 1 # Tránh chia cho 0
+#     percent = float(current) / total
+#     arrow = '-' * int(round(percent * bar_length) - 1) + '>'
+#     spaces = ' ' * (bar_length - len(arrow))
     
-    sys.stdout.write(f"\r🚀 Progress: [{arrow+spaces}] {int(percent * 100)}% ({current}/{total})")
-    sys.stdout.flush()
+#     sys.stdout.write(f"\r🚀 Progress: [{arrow+spaces}] {int(percent * 100)}% ({current}/{total})")
+#     sys.stdout.flush()
 
-def monitor_batch():
-    """Hàm này sẽ gọi liên tục lên server để xem tiến độ"""
-    print("\n👀 Monitoring Batch Progress...")
-    start_time = time.time()
+# def monitor_batch():
+#     """Hàm này sẽ gọi liên tục lên server để xem tiến độ"""
+#     print("\n👀 Monitoring Batch Progress...")
+#     start_time = time.time()
     
-    while True:
-        try:
-            resp = requests.get(f"{BASE_URL}/batch/status")
-            data = resp.json()
+#     while True:
+#         try:
+#             resp = requests.get(f"{BASE_URL}/batch/status")
+#             data = resp.json()
             
-            is_running = data.get("is_running", False)
-            processed = data.get("processed", 0)
-            total = data.get("total", 0)
+#             is_running = data.get("is_running", False)
+#             processed = data.get("processed", 0)
+#             total = data.get("total", 0)
             
-            draw_progress_bar(processed, total)
+#             draw_progress_bar(processed, total)
             
-            if not is_running and total > 0 and processed >= total:
-                print("\n\n✅ Batch Completed Successfully!")
-                break
+#             if not is_running and total > 0 and processed >= total:
+#                 print("\n\n✅ Batch Completed Successfully!")
+#                 break
             
-            if not is_running and total == 0:
-                # Trường hợp vừa start xong server chưa kịp cập nhật state
-                time.sleep(1)
-                continue
+#             if not is_running and total == 0:
+#                 # Trường hợp vừa start xong server chưa kịp cập nhật state
+#                 time.sleep(1)
+#                 continue
 
-            # Nếu server đã dừng nhưng chưa xong hết
-            if not is_running and processed < total and (time.time() - start_time > 5):
-                print("\n\n⚠️ Batch stopped unexpectedly.")
-                break
+#             # Nếu server đã dừng nhưng chưa xong hết
+#             if not is_running and processed < total and (time.time() - start_time > 5):
+#                 print("\n\n⚠️ Batch stopped unexpectedly.")
+#                 break
 
-            time.sleep(2) # Cập nhật mỗi 2 giây
+#             time.sleep(2) # Cập nhật mỗi 2 giây
 
-        except Exception as e:
-            print(f"\n❌ Monitoring Error: {e}")
-            break
+#         except Exception as e:
+#             print(f"\n❌ Monitoring Error: {e}")
+#             break
             
-    print(f"⏱️ Total Execution Time: {time.time() - start_time:.1f}s")
+#     print(f"⏱️ Total Execution Time: {time.time() - start_time:.1f}s")
 
 def start_batch_test(limit_arg):
     print(f"🔌 Connecting to Backend at {BASE_URL}...")
@@ -104,7 +104,7 @@ def start_batch_test(limit_arg):
             else:
                 print(f"✅ Batch Started! Server scheduled {data.get('count')} tasks.")
                 # 4. Chuyển sang chế độ theo dõi
-                monitor_batch()
+                # monitor_batch()
         else:
             print(f"❌ Failed to start batch: {resp.text}")
 

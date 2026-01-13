@@ -142,11 +142,11 @@ Run the backend server
 python ./backend/main.py
 ```
 
-Run the test (one instance or all instances)
-If one, change the desired task number inside test_one.py and run (Line 27:         target_task = tasks[0])
+Run the test
 ```bash
-python test_one.py
-python test_all.py
+python test_batch.py 5 (Change if needed, the first k tasks)
+python test_batch all (All tasks)
+python test_batch (Default, the first 10 tasks)
 ```
 
 Folder structure full
@@ -172,8 +172,7 @@ nocode-agent
       all_preds.jsonl
       summary_report.txt
   .env (You created)
-  test_all.py
-  test_one.py
+  test_batch.py
 ```
 
 

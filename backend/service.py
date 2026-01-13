@@ -86,13 +86,13 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
     input_for_agent = str(input_for_agent)
 
     # ==============================================================================
-    # 1. REPO ISOLATION (Tạo thư mục code riêng)
+    # 1. REPO ISOLATION
     # ==============================================================================
     success, base_repo_path_or_msg = setup_repo(task_data['repo'], task_data['base_commit'])
     if not success:
         return {"status": "error", "step": "setup_repo", "detail": base_repo_path_or_msg}
 
-    # Tạo folder tạm: workspace_temp/task_id_random
+    # Create temp folder: workspace_temp/task_id_random
     unique_id = f"{instance_id}_{uuid.uuid4().hex[:6]}"
     working_repo_path = os.path.join(WORKSPACE_TEMP_DIR, unique_id)
     
@@ -106,17 +106,33 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
     # 2. AGENT GENERATION
     # ==============================================================================
     repo_structure = get_repo_structure(working_repo_path)
-    target_files = agent.locate_files(doc_diff=input_for_agent, repo_structure=repo_structure)
+    loc_result = agent.locate_files(doc_diff=input_for_agent, repo_structure=repo_structure)
     
-    code_context = {}
-    if target_files:
-        for rel_path in target_files:
+    edit_paths = loc_result.get("edit_files", [])
+    context_paths = loc_result.get("context_files", [])
+
+    files_to_edit = {}
+    read_only_context_str = ""
+    
+    if edit_paths:
+        for rel_path in edit_paths:
             content, real_path = read_local_file(working_repo_path, rel_path)
-            if content: code_context[real_path] = content 
+            if content: files_to_edit[real_path] = content
+
+    if context_paths:
+        for rel_path in context_paths:
+            # Skip if file is already in edit list to avoid duplication
+            if rel_path in files_to_edit:
+                continue
+
+            content, real_path = read_local_file(working_repo_path, rel_path)
+            if content:
+                read_only_context_str += f"\n--- READ-ONLY FILE (DO NOT EDIT): {real_path} ---\n{content}\n"
 
     patch_result = agent.generate_patch(
         doc_diff=input_for_agent,
-        code_context=code_context,
+        files_to_edit=files_to_edit,           # Only these will be looped for editing
+        read_only_context=read_only_context_str, # This is just for reference
         instance_id=instance_id
     )
 

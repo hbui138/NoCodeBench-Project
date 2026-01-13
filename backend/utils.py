@@ -133,8 +133,7 @@ def get_repo_structure(repo_path):
     ignore_dirs = {
         '.git', '__pycache__', 'venv', 'env', 'build', 'dist', 
         '.github', '.circleci', '.idea', '.vscode', 
-        'site-packages', 'node_modules', 'doc', 'docs',
-        'test', 'tests', 'testing', 'benchmarks'
+        'site-packages', 'node_modules', 'doc', 'docs'
     }
     
     # Whitelist the file extensions to include
@@ -169,9 +168,6 @@ def get_repo_structure(repo_path):
         
         subindent = ' ' * 2 * (level + 1)
         for f in files:
-            if f.startswith("test_") or f.endswith("_test.py") or "conftest" in f:
-                continue
-
             _, ext = os.path.splitext(f)
             if ext in include_extensions:
                 structure_lines.append(f"{subindent}{f}")
