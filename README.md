@@ -91,7 +91,7 @@ docker compose version
 Move into the environment directory inside the benchmark core:
 
 ```bash
-cd bench_core/environment
+cd bench-core/environment
 ```
 
 Pull repository-level images using the provided script:
@@ -102,7 +102,12 @@ bash ./pull_from_hub.sh
 
 This downloads all base Docker images required for running the benchmark tasks.
 
-### **2.3 Verify Dataset Availability**
+### **2.3 Clone repo**
+```bash
+cd bench-core/repos
+bash ./collect.sh
+```
+### **2.4 Verify Dataset Availability**
 
 Use the built‑in script to check whether datasets are correctly downloaded:
 
@@ -139,5 +144,35 @@ python ./backend/main.py
 
 Run the test
 ```bash
-python test_backend.py
+python test_batch.py 5 (Change if needed, the first k tasks)
+python test_batch all (All tasks)
+python test_batch (Default, the first 10 tasks)
 ```
+
+Folder structure full
+```bash
+nocode-agent
+  .github/workflows/
+  backend
+    agent.py
+    main.py
+    requirements.txt
+    schemas.py
+    state.py
+    utils.py
+    service.py
+  bench-core (folder you clone the nocodebench repo)
+    requirements.txt (modules used by bench-core)
+    repos
+    evaluation
+  frondend
+  results (What you get after running the tests)
+    results_timestamp
+      evaluation_logs
+      all_preds.jsonl
+      summary_report.txt
+  .env (You created)
+  test_batch.py
+```
+
+

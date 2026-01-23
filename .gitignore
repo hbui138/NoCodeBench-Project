@@ -6,6 +6,8 @@ __pycache__/
 all_preds.jsonl
 all_preds_summary_report.txt
 evaluation/logs/*
+/results/*
+/workspace_temp/*
 
 # C extensions
 *.so

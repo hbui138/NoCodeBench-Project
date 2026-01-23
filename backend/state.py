@@ -26,10 +26,15 @@ class BatchManager:
 
     def stop(self):
         self.stop_signal = True
+        self.is_running = False
 
     def finish(self):
         self.is_running = False
         self.current_task_id = None
+
+    def log(self, message: str):
+        self.logs.append(message)
+        if len(self.logs) > 100: self.logs.pop(0)
 
 # Initialize a global instance of BatchManager
 batch_state = BatchManager()

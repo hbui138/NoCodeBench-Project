@@ -1,9 +1,13 @@
 # schemas.py
 from pydantic import BaseModel
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 
 class RunRequest(BaseModel):
     instance_id: str
+
+class BatchStartRequest(BaseModel):
+    limit: int = 0
+    ids: Optional[List[str]] = None
 
 class BatchStatusResponse(BaseModel):
     is_running: bool

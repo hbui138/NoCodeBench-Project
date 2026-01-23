@@ -1,0 +1,49 @@
+name: NoCode-bench Remote Evaluation
+
+on:
+  push:
+    branches: [ wip-test ]
+  workflow_dispatch: # Cho phép bấm nút chạy thủ công trên web
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          # Cài đặt thư viện cho Backend (Agent của bạn)
+          pip install -r backend/requirements.txt
+          
+          # Cài đặt thư viện cho Bench-core (Môi trường đánh giá)
+          if [ -d "bench-core" ]; then
+            pip install -r bench-core/requirements.txt
+          fi
+
+      - name: Start Backend Server and Run Tests
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}/bench-core:${{ env.PYTHONPATH }}
+        run: |
+          # 1. Khởi động server chạy ngầm
+          python backend/main.py & 
+          
+          # 2. Chờ 5-10 giây để server khởi động xong
+          sleep 10
+          
+          # 3. Chạy script test (script này sẽ gửi request đến localhost:port)
+          python test_one.py
+
+      - name: Upload Results
+        if: always() # Luôn lưu kết quả dù test pass hay fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: amse-results
+          path: results/ # Gom toàn bộ folder results về cho bạn
