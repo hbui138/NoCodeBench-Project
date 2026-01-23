@@ -1,4 +1,4 @@
-# NoCode-bench-ATSE-TUM
+# NoCode-bench-Project
 An AI agent that generates code patches from documentation changes. Project for "Advanced Topics in Software Engineering" at TUM.
 
 # NoCode-Agent Setup Guide (Steps 1–2)
