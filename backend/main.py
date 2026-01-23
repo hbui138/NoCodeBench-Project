@@ -88,10 +88,9 @@ def get_task_result(instance_id: str):
     all_results = load_results_from_file()
     run_result = all_results.get(instance_id, {})
 
-    # Bóc tách dữ liệu
     patch = run_result.get("model_patch", "")
     usage = run_result.get("token_usage", {"prompt": 0, "completion": 0, "total": 0})
-    is_success = run_result.get("eval_summary", {}) # Lấy từ field mới hợp nhất
+    is_success = run_result.get("success", False)
 
     return {
         "info": {
@@ -122,6 +121,7 @@ def run_single(req: schemas.RunRequest):
 
     # Gọi logic từ service
     result = service.run_task_logic(req.instance_id, is_batch_mode=False)
+    service.run_final_aggregation_and_cleanup()
     return result
 
 # ==========================================
@@ -183,7 +183,7 @@ def stop_batch():
 def load_results_from_file():
     results = {}
     
-    # 1. Đọc dữ liệu cơ bản (Patch, Token)
+    # 1. Read main predictions file
     pred_file = service.MAIN_PREDICTIONS_FILE 
     if pred_file and os.path.exists(pred_file):
         with open(pred_file, "r") as f:
@@ -192,13 +192,13 @@ def load_results_from_file():
                     data = json.loads(line)
                     iid = data['instance_id']
                     results[iid] = data
-                    # Khởi tạo mặc định các trường eval
+                    # Initialize fields in case missing
                     results[iid]['success'] = False
                     results[iid]['p2p_stats'] = {"success": [], "fail": []}
                     results[iid]['f2p_stats'] = {"success": [], "fail": []}
                 except: pass
 
-    # 2. Đọc dữ liệu chi tiết (Success, P2P, F2P)
+    # 2. Read evaluation details file to enrich resultss
     eval_details_path = os.path.join(service.LOG_DIR, "evaluation_details.jsonl")
     
     if os.path.exists(eval_details_path):
@@ -209,29 +209,37 @@ def load_results_from_file():
                     iid = eval_data.get('instance_id')
                     
                     if iid in results:
-                        # Lưu trạng thái resolved (thành công tổng thể)
+                        # Save overall success flag
                         results[iid]['success'] = eval_data.get('resolved', False)
                         
-                        # Lưu chi tiết P2P (Các test vốn đã pass, nay ntn?)
+                        # Save detailed P2P stats
                         p2p_data = eval_data.get('P2P', {})
                         results[iid]['p2p_stats'] = {
                             "success": p2p_data.get('success', []),
                             "fail": p2p_data.get('failure', []) or p2p_data.get('fail', [])
                         }
                         
-                        # Lưu chi tiết F2P (Các test vốn bị fail, nay có sửa được không?)
+                        # Save detailed F2P stats
                         f2p_data = eval_data.get('F2P', {})
                         results[iid]['f2p_stats'] = {
                             "success": f2p_data.get('success', []),
                             "fail": f2p_data.get('failure', []) or f2p_data.get('fail', [])
                         }
                         
-                        # Lưu chú thích nếu có (ví dụ: "Instance not attempted")
+                        # Notes field
                         results[iid]['notes'] = eval_data.get('notes', "")
                 except: pass
                 
     return results
 
+@app.get("/batch/report")
+def get_batch_report():
+    """API endpoint to get summary report content."""
+    content = service.get_summary_report_content()
+    if content is None:
+        return {"content": "No active run directory found."}
+    return {"content": content}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)

@@ -26,6 +26,7 @@ class BatchManager:
 
     def stop(self):
         self.stop_signal = True
+        self.is_running = False
 
     def finish(self):
         self.is_running = False

@@ -1,10 +1,12 @@
 # service.py
 import os
 import json
+import stat
 import subprocess
 import concurrent.futures
 import threading
 import shutil
+from time import time
 import uuid
 from collections import deque
 from datetime import datetime
@@ -57,6 +59,26 @@ def initialize_paths(force_new=False):
 # Khóa để ghi vào file tổng an toàn
 FILE_WRITE_LOCK = threading.Lock() 
 
+def get_summary_report_content():
+    initialize_paths()
+    if not CURRENT_RUN_DIR or not os.path.exists(CURRENT_RUN_DIR):
+        return "No active session found."
+
+    try:
+        files = os.listdir(CURRENT_RUN_DIR)
+        report_file = next((f for f in files if f.endswith("_summary_report.txt")), None)
+        
+        if not report_file:
+            return "Report is being generated... please wait or check backend folder."
+            
+        full_path = os.path.join(CURRENT_RUN_DIR, report_file)
+        
+        with open(full_path, "r", encoding="utf-8") as f:
+            return f.read()
+            
+    except Exception as e:
+        return f"Error reading report: {e}"
+    
 def run_task_logic(instance_id: str, is_batch_mode: bool = False):
     initialize_paths()
     
@@ -191,6 +213,8 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
 
     env = os.environ.copy()
     env["PYTHONPATH"] = bench_core_path + os.pathsep + env.get("PYTHONPATH", "")
+
+    env["PYTHONIOENCODING"] = "utf-8"
     
     eval_result_log = ""
     is_passed = False
@@ -337,14 +361,58 @@ AVERAGE TOKENS/TASK:   {avg_token:,.2f}
         # Cleanup global temp workspace
         if os.path.exists(WORKSPACE_TEMP_DIR):
             print(f"🧹 Cleaning up global temp: {WORKSPACE_TEMP_DIR}")
-            import time
-            time.sleep(2) 
-            shutil.rmtree(WORKSPACE_TEMP_DIR, ignore_errors=True)
-            print("✨ Workspace temp cleared.")
+            force_delete_directory(WORKSPACE_TEMP_DIR)
     
     except Exception as e:
         print(f"❌ Error during final aggregation & cleanup: {e}")
 
+def remove_readonly(func, path, _):
+    """Helper to handle read-only files (common in Git repos) on Windows."""
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+def force_delete_directory(path: str, retries: int = 5, delay: float = 1.0):
+    """
+    Aggressively attempts to delete a directory.
+    1. Removes read-only attributes.
+    2. Retries multiple times.
+    3. Uses Windows System Command as a last resort.
+    """
+    if not os.path.exists(path):
+        return
+
+    print(f"🧹 Attempting to delete: {path}")
+    
+    # Attempt 1: Standard Python shutil with read-only handler and retry loop
+    for i in range(retries):
+        try:
+            shutil.rmtree(path, onerror=remove_readonly)
+        except OSError:
+            # If failed, wait a bit (file might be locked by AV or OS)
+            time.sleep(delay)
+        
+        # Check if gone
+        if not os.path.exists(path):
+            print("✨ Deleted successfully via Python shutil.")
+            return
+
+    # Attempt 2: The "Nuclear" Option (Windows CMD)
+    # If Python fails, ask Windows to force delete
+    try:
+        print("⚠️ Python delete failed. Using Windows system command...")
+        # /S = Subdirectories, /Q = Quiet (No confirmation)
+        subprocess.run(["rmdir", "/S", "/Q", path], shell=True, check=False)
+        
+        if not os.path.exists(path):
+            print("✨ Deleted successfully via System Command.")
+        else:
+            print("❌ Failed to delete even with System Command. Check for open processes.")
+    except Exception as e:
+        print(f"❌ Error during system force delete: {e}")
+        
 def run_batch_process(task_ids: list):
     # Config
     MAX_WORKERS = 2
@@ -359,7 +427,12 @@ def run_batch_process(task_ids: list):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         while queue or futures_map:
-            while queue and len(futures_map) < MAX_WORKERS:
+            if not state.batch_state.is_running:
+                print("\n🛑 STOP SIGNAL RECEIVED from User!")
+                queue.clear()
+                state.batch_state.logs.append("⚠️ Batch stopped by user request.")
+
+            while state.batch_state.is_running and queue and len(futures_map) < MAX_WORKERS:
                 t_id, retry_count = queue.popleft()
                 future = executor.submit(run_task_logic, t_id, is_batch_mode=True)
                 futures_map[future] = (t_id, retry_count)
@@ -371,15 +444,18 @@ def run_batch_process(task_ids: list):
                     t_id, retry_count = futures_map.pop(future)
                     try:
                         res = future.result()
-                        # Xử lý Retry 503...
+                        # Handle retry on overload
                         is_overload = False
                         if res.get("status") == "error" and ("503" in str(res) or "overload" in str(res).lower()):
                             is_overload = True
 
                         if is_overload:
                             if retry_count < MAX_TASK_RETRIES:
-                                print(f"🔄 Re-queuing {t_id}")
-                                queue.append((t_id, retry_count + 1))
+                                if state.batch_state.is_running:
+                                    print(f"🔄 Re-queuing {t_id}")
+                                    queue.append((t_id, retry_count + 1))
+                                else:
+                                    print(f"⚠️ Skipped retry for {t_id} because batch is stopping.")
                             else:
                                 print(f"❌ Failed {t_id}")
                                 state.batch_state.processed_count += 1
@@ -391,8 +467,6 @@ def run_batch_process(task_ids: list):
                     except Exception as e:
                         print(f"💥 Crash {t_id}: {e}")
                         state.batch_state.processed_count += 1
-
-        pass
 
     state.batch_state.finish()
     print("\n✅ All threads finished. Starting Final Aggregation & Cleanup...")
