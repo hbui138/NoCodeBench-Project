@@ -13,6 +13,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
   useEffect(() => {
     fetchTasks()
   }, [])
@@ -46,6 +48,10 @@ function App() {
   const handleTaskSelect = (task) => {
     setSelectedTask(task)
     fetchTaskDetail(task.id)
+  }
+
+  const handleBatchTick = () => {
+    setRefreshTrigger(prev => prev + 1)
   }
 
   return (
@@ -87,7 +93,3 @@ function App() {
 }
 
 export default App
-
-
-
-

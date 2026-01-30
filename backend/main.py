@@ -14,17 +14,20 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # --- HELPER: Load tasks ---
-# --- 1. LIFESPAN (Khởi tạo dữ liệu khi Server bật) ---
+# --- 1. LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("\n⏳ [STARTUP] Downloading & Loading Dataset from Hugging Face...")
     try:
         ds = load_dataset('NoCode-bench/NoCode-bench_Verified', split='test')
+
+        # Get first k items for testing
+        # ds = ds.select([i for i in list(range(2))])
         
         state.data_map = {}
         count = 0
         for item in ds:
-            # Chuyển row thành dict
+            # Change row to dict
             t = dict(item)
             
             t_id = t.get('instance_id')
@@ -37,9 +40,8 @@ async def lifespan(app: FastAPI):
         
     except Exception as e:
         print(f"❌ [STARTUP ERROR] Could not load dataset: {e}")
-        # (Tùy chọn) Load fallback từ file local nếu cần
     
-    yield  # Server chạy tại điểm này
+    yield
     
     print("🛑 [SHUTDOWN] Cleaning up resources...")
     state.data_map.clear()
@@ -171,8 +173,8 @@ def get_batch_status():
         "total": s.total_tasks,
         "current_task": None,
         "progress_percent": round(percent, 2),
-        "latest_logs": s.logs[-10:] if hasattr(s, 'logs') else [], # Lấy 10 log cuối
-        "results_summary": s.results if hasattr(s, 'results') else [] # Lấy danh sách kết quả
+        "latest_logs": s.logs[-10:] if hasattr(s, 'logs') else [],
+        "results_summary": s.results if hasattr(s, 'results') else []
     }
 
 @app.post("/batch/stop")

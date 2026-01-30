@@ -3,7 +3,7 @@ import './BatchControl.css'
 
 const API_BASE = 'http://localhost:8000'
 
-function BatchControl() {
+function BatchControl({ onBatchTick }) {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -12,12 +12,10 @@ function BatchControl() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (status?.is_running) {
-        fetchStatus()
-      }
+      fetchStatus()
     }, 2000)
     return () => clearInterval(interval)
-  }, [status?.is_running])
+  }, [])
 
   const fetchStatus = async () => {
     try {
@@ -25,6 +23,10 @@ function BatchControl() {
       if (response.ok) {
         const data = await response.json()
         setStatus(data)
+
+        if (data.is_running && onBatchTick) {
+            onBatchTick()
+        }
       }
     } catch (error) {
       console.error('Failed to fetch batch status:', error)
@@ -138,7 +140,7 @@ function BatchControl() {
               onClick={handleViewReport}
               style={{
                 marginLeft: '10px',
-                backgroundColor: '#009688', // Màu xanh Teal
+                backgroundColor: '#009688',
                 color: 'white',
                 border: 'none',
                 padding: '8px 16px',

@@ -299,6 +299,52 @@
     border: 1px solid #333;
 }
 
+/* --- PATCH VIEWER STYLES --- */
+.patch-container {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-top: 10px;
+}
+
+.diff-line {
+  padding: 0 10px;
+  white-space: pre-wrap; /* Giữ nguyên khoảng trắng thụt đầu dòng */
+  word-break: break-all;
+  min-height: 1.2em; /* Đảm bảo dòng trống vẫn có chiều cao */
+}
+
+/* Dòng thêm mới (+): Nền xanh nhạt, chữ tối */
+.diff-add {
+  background-color: #e6ffec;
+  color: #24292e;
+}
+
+/* Dòng bị xóa (-): Nền đỏ nhạt, chữ tối */
+.diff-remove {
+  background-color: #ffebe9;
+  color: #24292e;
+}
+
+/* Dòng Header (@@ ... @@): Màu xanh dương nhạt hoặc tím */
+.diff-header {
+  background-color: #f1f8ff;
+  color: #0366d6;
+  font-weight: bold;
+  border-top: 1px solid #e1e4e8;
+  border-bottom: 1px solid #e1e4e8;
+}
+
+/* Dòng Header file (--- hoặc +++) */
+.diff-file-header {
+  font-weight: bold;
+  color: #666;
+  background-color: #fafafa;
+}
 
 
 

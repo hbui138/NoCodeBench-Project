@@ -1,13 +1,86 @@
-import { useState } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import './TaskDetail.css'
 
 const API_BASE = 'http://localhost:8000'
 
-function TaskDetail({ task, taskDetail, onRun }) {
+const PatchViewer = ({ patch }) => {
+  if (!patch) return <div className="no-patch">No patch generated</div>;
+
+  return (
+    <div className="patch-container">
+      {patch.split('\n').map((line, index) => {
+        let className = "diff-line";
+        
+        // Logic xác định màu sắc dựa vào ký tự đầu dòng
+        if (line.startsWith('@@')) {
+            className += " diff-header";
+        } else if (line.startsWith('+++') || line.startsWith('---')) {
+            className += " diff-file-header";
+        } else if (line.startsWith('+')) {
+            className += " diff-add";
+        } else if (line.startsWith('-')) {
+            className += " diff-remove";
+        }
+
+        return (
+          <div key={index} className={className}>
+            {line}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+function TaskDetail({ task, taskDetail, onRun, refreshTrigger }) {
   const [result, setResult] = useState(null)
   const [reportText, setReportText] = useState(null)
   const [running, setRunning] = useState(false)
   const [activeTab, setActiveTab] = useState('details')
+
+  const fetchLatestResult = useCallback(async () => {
+    try {
+      const detailResponse = await fetch(`${API_BASE}/results/${task.id}`)
+      
+      if (detailResponse.ok) {
+        const detailData = await detailResponse.json()
+        if (detailData.result) {
+            setResult(detailData.result)
+        }
+      }
+    } catch (error) {
+      console.error("Auto-fetch result error:", error)
+    }
+  }, [task.id]) 
+
+  const fetchSummaryReport = useCallback(async () => {
+    try {
+      const resp = await fetch(`${API_BASE}/batch/report`)
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.content) {
+            setReportText(data.content)
+        }
+      }
+    } catch (e) {
+      console.error("Fetch report error:", e)
+    }
+  }, [])
+
+  useEffect(() => {
+    setResult(null) 
+    setActiveTab('details')
+    
+    fetchLatestResult()
+    fetchSummaryReport()
+  }, [task.id, fetchLatestResult, fetchSummaryReport])
+
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+        fetchLatestResult()
+        fetchSummaryReport()
+    }
+  }, [refreshTrigger, fetchLatestResult, fetchSummaryReport])
 
   const handleRun = async () => {
     setRunning(true)
@@ -26,13 +99,7 @@ function TaskDetail({ task, taskDetail, onRun }) {
         throw new Error('Failed to run task')
       }
 
-      const detailResponse = await fetch(`${API_BASE}/results/${task.id}`)
-      
-      if (!detailResponse.ok) throw new Error('Failed to fetch detailed results')
-
-      const detailData = await detailResponse.json()
-
-      setResult(detailData.result)
+      await fetchLatestResult()
       await fetchSummaryReport()
 
       setActiveTab('result')
@@ -40,18 +107,6 @@ function TaskDetail({ task, taskDetail, onRun }) {
       setResult({ status: 'error', detail: error.message })
     } finally {
       setRunning(false)
-    }
-  }
-
-  const fetchSummaryReport = async () => {
-    try {
-      const resp = await fetch(`${API_BASE}/batch/report`)
-      if (resp.ok) {
-        const data = await resp.json()
-        setReportText(data.content)
-      }
-    } catch (e) {
-      console.error("Fetch report error:", e)
     }
   }
 
@@ -167,7 +222,7 @@ function TaskDetail({ task, taskDetail, onRun }) {
             {result.patch && (
                 <div className="result-section">
                     <h3>Generated Patch</h3>
-                    <pre className="code-block">{result.patch}</pre>
+                    <PatchViewer patch={result.patch} />
                 </div>
             )}
 
@@ -223,7 +278,3 @@ function TaskDetail({ task, taskDetail, onRun }) {
 }
 
 export default TaskDetail
-
-
-
-

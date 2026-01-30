@@ -20,7 +20,7 @@ class NoCodeAgent:
         self.current_task_tokens["completion"] += getattr(metadata, 'candidates_token_count', 0) or 0
         self.current_task_tokens["total"] += getattr(metadata, 'total_token_count', 0) or 0
 
-    def __init__(self, model_name="gemini-3-flash-preview"):
+    def __init__(self, model_name="gemini-3-pro-preview"):
         self.model_name = model_name
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
@@ -87,6 +87,88 @@ class NoCodeAgent:
             print(f"⚠️ Locate Error: {e}")
             return {"edit_files": [], "context_files": []}
 
+    def _clean_response(self, text: str) -> str:
+        """
+        Removes Markdown code blocks and extra whitespace from the LLM response.
+        """
+        if not text:
+            return ""
+        
+        pattern = r"```(?:diff|patch)?\n(.*?)```"
+        matches = re.findall(pattern, text, re.DOTALL)
+        if matches:
+            return max(matches, key=len).strip()
+        
+        # Remove Markdown code fences (e.g., ```diff ... ```)
+        lines = text.splitlines()
+        cleaned_lines = []
+        in_diff = False
+        
+        for line in lines:
+            if line.startswith("diff --git") or line.startswith("--- ") or line.startswith("+++ "):
+                in_diff = True
+            
+            if in_diff:
+                if line.strip().startswith("```"): continue
+                cleaned_lines.append(line)
+                
+        if cleaned_lines:
+            return "\n".join(cleaned_lines).strip()
+            
+        return text.strip()
+    
+    def syntax_check(self, broken_patch: str) -> str:
+        """
+        Use AI for syntax checking and formatting of a git patch.
+        """
+        if not self.client or not broken_patch: 
+            return broken_patch
+        
+        if len(broken_patch) < 10: return broken_patch
+
+        prompt = f"""
+        ROLE: Git Patch Formatter (Non-Intrusive).
+        TASK: Fix the structural format of the provided Git Patch so `git apply` accepts it.
+
+        INPUT PATCH:
+        {broken_patch}
+
+        STRICT RULES (READ CAREFULLY):
+        1. TARGET: Fix ONLY the diff container (headers, hunk markers, indentation).
+        2. FORBIDDEN: DO NOT change the code logic. 
+           - DO NOT rename variables or classes.
+           - DO NOT add missing imports.
+           - DO NOT fix Python syntax errors. 
+           - If the input code is buggy, KEEP IT BUGGY. Your job is only to make it a valid patch file.
+        3. HEADERS: Ensure `diff --git`, `--- a/...`, `+++ b/...` are correct.
+        4. HUNKS: Recalculate `@@ -start,count +start,count @@` numbers strictly.
+        5. WHITESPACE: Ensure context lines start with a single space ' '.
+        6. NO DUPLICATES: Check boundary between '+' lines and context lines. If the inserted line is IDENTICAL to the context line immediately following it, REMOVE the insertion to avoid duplication.
+        7. NO ORPHANED BLOCKS (CRITICAL): 
+           - Watch out for `else:`, `elif:`, `except:`, or `finally:` in the context lines (lines starting with ' ') immediately following an insertion (`+`).
+           - IF you inserted a full logic block that ends with a `return` or closes a scope, AND the next context line is an `else:` or `elif:` from the old code -> YOU MUST REMOVE THE OLD CONTEXT LINES (change ' ' to '-').
+           - ERROR EXAMPLE:
+                 if condition:
+             +       return new_value
+                 old_code()
+             else:            <-- SYNTAX ERROR: This 'else' is now orphaned because 'if' returned above.
+           - FIX: Mark 'old_code()' and 'else:' as deleted ('-').
+
+        OUTPUT:
+        Return ONLY the raw patch string.
+        """
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(temperature=0.0)
+            )
+            self._update_tokens(response.usage_metadata)
+            return self._clean_response(response.text) 
+        except Exception:
+            return broken_patch
+        
     def generate_patch(self, doc_diff: str, files_to_edit: dict, read_only_context: str = "", instance_id: str = None) -> str:
         """
         Docstring for generate_patch

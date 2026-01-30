@@ -83,7 +83,7 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
     initialize_paths()
     
     # [THREAD SAFETY] Initialize a new Agent instance per thread
-    agent = NoCodeAgent(model_name="gemini-2.5-pro")
+    agent = NoCodeAgent(model_name="gemini-2.5-flash")
     agent.reset_task_tokens()
 
     task_data = state.data_map.get(instance_id)
@@ -166,11 +166,29 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
         shutil.rmtree(working_repo_path, ignore_errors=True)
         return {
             "status": "error", 
-            "detail": "api_overload_skip"  # Từ khóa để run_batch_process bắt được
+            "detail": "api_overload_skip"
         }
 
     # If normal string patch
-    patch = patch_result
+    current_patch = patch_result
+
+    # raw_patch_filename = f"{instance_id}_RAW.patch"
+    # raw_patch_path = os.path.join(LOG_DIR, raw_patch_filename)
+    
+    # try:
+    #     with open(raw_patch_path, "w", encoding="utf-8") as f:
+    #         f.write(current_patch)
+    #     print(f"💾 Saved RAW patch to: {raw_patch_filename}")
+    # except Exception as e:
+    #     print(f"⚠️ Failed to save raw patch: {e}")
+
+    # print(f"🕵️ AI Reviewing patch syntax...")
+
+    # final_patch = agent.syntax_check(broken_patch=current_patch)
+
+    # patch = final_patch
+
+    patch = current_patch
 
     if not patch:
         shutil.rmtree(working_repo_path, ignore_errors=True)
@@ -226,7 +244,10 @@ def run_task_logic(instance_id: str, is_batch_mode: bool = False):
 
         result = subprocess.run(
             cmd, cwd=bench_core_path, env=env,
-            capture_output=True, text=True
+            capture_output=True, 
+            text=True, 
+            encoding='utf-8',
+            errors='replace'
         )
         eval_result_log = result.stdout + "\nErrors:\n" + result.stderr
         is_passed = "PASSED" in eval_result_log
@@ -283,7 +304,16 @@ def run_final_aggregation_and_cleanup():
         env = os.environ.copy()
         env["PYTHONPATH"] = bench_core_path + os.pathsep + env.get("PYTHONPATH", "")
 
-        subprocess.run(final_cmd, cwd=bench_core_path, env=env, check=True)
+        subprocess.run(
+            final_cmd, 
+            cwd=bench_core_path, 
+            env=env, 
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace'
+        )
 
         task_details = []
         total_prompt = 0
