@@ -16,6 +16,46 @@ from backend import service
 from backend import state
 
 class TestService:
+    @pytest.fixture(scope="session", autouse=True)
+    def cleanup_artifacts(self):
+        """
+        Run once per test session to clean up any artifacts from previous runs before starting new tests.
+        """
+        service.CURRENT_RUN_DIR = None
+        yield 
+        
+        print("\n🧹 [TEARDOWN] Cleaning up artifacts...")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.abspath(os.path.join(current_dir, ".."))
+
+        workspace_path = os.path.join(project_root, "workspace_temp")
+        if os.path.exists(workspace_path):
+            try:
+                shutil.rmtree(workspace_path)
+                print(f"✅ Đã xóa workspace: {workspace_path}")
+            except: pass
+
+        # Delete the latest results_ folder if it exists (to ensure clean state for next run)
+        results_base_dir = os.path.join(project_root, "results")
+        
+        if os.path.exists(results_base_dir):
+            all_runs = [
+                d for d in os.listdir(results_base_dir) 
+                if d.startswith("results_") and os.path.isdir(os.path.join(results_base_dir, d))
+            ]
+            
+            all_runs.sort()
+            
+            if all_runs:
+                latest_run = all_runs[-1]
+                latest_run_path = os.path.join(results_base_dir, latest_run)
+                
+                try:
+                    shutil.rmtree(latest_run_path)
+                except Exception as e:
+                    print(f"⚠️ Cannot delete {latest_run}: {e}")
+            else:
+                print("ℹ️ Did not find any results_ folders to clean.")
 
     @pytest.fixture(autouse=True)
     def setup_state(self):

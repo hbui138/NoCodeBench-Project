@@ -96,7 +96,7 @@ class TestUtils:
             assert m.call_count == 2
 
     # =========================================================================
-    # 3. TEST read_local_file (CRITICAL FIXES HERE)
+    # 3. TEST read_local_file
     # =========================================================================
     
     # We must patch 'backend.utils.os.path.exists' because utils.py imports os
