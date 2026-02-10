@@ -20,7 +20,7 @@ class NoCodeAgent:
         self.current_task_tokens["completion"] += getattr(metadata, 'candidates_token_count', 0) or 0
         self.current_task_tokens["total"] += getattr(metadata, 'total_token_count', 0) or 0
 
-    def __init__(self, model_name="gemini-3-pro-preview"):
+    def __init__(self, model_name="gemini-2.5-flash"):
         self.model_name = model_name
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
@@ -30,6 +30,10 @@ class NoCodeAgent:
             self.client = genai.Client(api_key=api_key)
 
     def locate_files(self, doc_diff: str, repo_structure: str = "") -> dict:
+        """
+        Use AI to locate which files need to be edited and which are read-only context.
+        """
+
         if not self.client: return {"edit_files": [], "context_files": []}
 
         if not hasattr(self, 'current_task_tokens'):
@@ -331,6 +335,9 @@ class NoCodeAgent:
         return total_patch
 
     def _construct_valid_diff(self, original_code, filename, ai_output):
+        """
+        Construct and verify a valid unified diff from AI output.
+        """
         try:
             if not ai_output or not isinstance(ai_output, str): return ""
 

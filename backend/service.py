@@ -6,7 +6,7 @@ import subprocess
 import concurrent.futures
 import threading
 import shutil
-from time import time
+import time
 import uuid
 from collections import deque
 from datetime import datetime
@@ -31,24 +31,24 @@ def initialize_paths(force_new=False):
     BASE_RESULTS_DIR = os.path.join(ROOT_DIR, "results")
     WORKSPACE_TEMP_DIR = os.path.join(ROOT_DIR, "workspace_temp")
 
-    # Nếu gọi để chạy task mới (force_new=True) HOẶC lần đầu tiên khởi động mà chưa có folder nào
+    # Initialize or recover run directory
     if force_new or CURRENT_RUN_DIR is None:
         all_runs = []
         if os.path.exists(BASE_RESULTS_DIR):
             all_runs = [d for d in os.listdir(BASE_RESULTS_DIR) if d.startswith("results_")]
 
-        # Chế độ Discovery: Nếu không ép tạo mới, hãy thử tìm folder mới nhất hiện có
+        # If not force_new and previous runs exist, recover latests
         if not force_new and all_runs:
             latest_run = sorted(all_runs)[-1]
             CURRENT_RUN_DIR = os.path.join(BASE_RESULTS_DIR, latest_run)
             print(f"🔄 Recovered latest session: {latest_run}")
         else:
-            # Chế độ Creation: Tạo timestamp mới
+            # Create new timestamped results directory
             TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
             CURRENT_RUN_DIR = os.path.join(BASE_RESULTS_DIR, f"results_{TIMESTAMP}")
             print(f"🆕 Created NEW session: {CURRENT_RUN_DIR}")
 
-        # Cập nhật các biến đường dẫn
+        # Create necessary directories
         LOG_DIR = os.path.join(CURRENT_RUN_DIR, "evaluation_logs")
         MAIN_PREDICTIONS_FILE = os.path.join(CURRENT_RUN_DIR, "all_preds.jsonl")
 
@@ -56,7 +56,7 @@ def initialize_paths(force_new=False):
         os.makedirs(WORKSPACE_TEMP_DIR, exist_ok=True)
 
 # --- GLOBAL LOCKS ---
-# Khóa để ghi vào file tổng an toàn
+# Lock for writing to main predictions file
 FILE_WRITE_LOCK = threading.Lock() 
 
 def get_summary_report_content():

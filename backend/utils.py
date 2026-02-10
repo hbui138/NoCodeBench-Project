@@ -79,12 +79,12 @@ def read_local_file(repo_path, rel_path):
     
     clean_rel_path = rel_path.lstrip("/\\")
     
-    # --- CHIẾN LƯỢC 1: Đường dẫn tuyệt đối hoặc chính xác ---
+    # --- Level 1: Scan the directory for the paths---
     direct_path = os.path.join(repo_path, clean_rel_path)
     if os.path.exists(direct_path):
         return _read_file_safe(direct_path), clean_rel_path
 
-    # --- CHIẾN LƯỢC 2: Các tiền tố phổ biến (Heuristics) ---
+    # --- Level 2: Get the folders with potential code sources ---
     repo_name = os.path.basename(repo_path.rstrip("/\\"))
     common_prefixes = [
         "src/", "lib/", "core/", "python/", 
@@ -97,29 +97,27 @@ def read_local_file(repo_path, rel_path):
             real_rel_path = f"{prefix}{clean_rel_path}"
             return _read_file_safe(candidate), real_rel_path # <--- Trả về đường dẫn tìm được
 
-    # --- CHIẾN LƯỢC 3: Quét đệ quy toàn bộ (Deep Search) ---
+    # --- Level 3: Deep search for all the files ---
     print(f"🕵️‍♀️ Deep searching for '{clean_rel_path}' in {repo_name}...")
     
     target_name = os.path.basename(clean_rel_path) # VD: models.py
     
-    # Chuẩn hóa đường dẫn mục tiêu để so sánh (đổi \ thành /)
     norm_target = clean_rel_path.replace("\\", "/") 
 
     for root, dirs, files in os.walk(repo_path):
-        # Bỏ qua folder rác nhưng KHÔNG bỏ qua folder code
+        # Skip some common irrelevant directories
         dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'venv', 'build', 'dist', '.idea', '.vscode'}]
         
         if target_name in files:
             found_path = os.path.join(root, target_name)
             
-            # Kiểm tra xem đường dẫn tìm thấy có "kết thúc bằng" đường dẫn mục tiêu không
-            # VD: Tìm "utils/log.py", thấy "src/utils/log.py" -> KHỚP
+            # Check if the found path ends with the desired relative path
             norm_found = found_path.replace("\\", "/")
             
             if norm_found.endswith(norm_target):
                 print(f"✅ Found via deep search: {found_path}")
                 real_rel_path = os.path.relpath(found_path, repo_path).replace("\\", "/")
-                return _read_file_safe(found_path), real_rel_path # <--- Trả về đường dẫn thật
+                return _read_file_safe(found_path), real_rel_path # Return the found relative path
 
     print(f"❌ Could not find file: {rel_path}")
     return None, None
