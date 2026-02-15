@@ -5,6 +5,13 @@ An AI agent that generates code patches from documentation changes. Project for 
 
 This guide summarizes the essential steps required to set up the project environment for **NoCode-Agent**, including project structure, environment setup, dependencies, Docker configuration, and dataset preparation.
 
+## 🛠 Prerequisites
+Before you begin, ensure you have the following installed:
+* **Conda** (Miniconda/Anaconda)
+* **Docker Desktop** (Running in the background)
+* **Node.js & npm** (For the frontend)
+* **Python 3.12**
+
 ---
 
 ## ✅ Step 1 — Initialize Project & Environment
@@ -135,7 +142,7 @@ mask_doc_diff: (list) - The documentation changes in a certain PR, which masked 
 problem_statement: (str) - The main input contained `mask_doc_diff` and `augmentations`.
 ```
 
-Run the pipeline
+## Step 3 — Running the Pipeline (Backend & Evaluation)
 
 Run the backend server
 ```bash
@@ -148,6 +155,24 @@ python test_batch.py 5 (Change if needed, the first k tasks)
 python test_batch all (All tasks)
 python test_batch (Default, the first 10 tasks)
 ```
+
+## Step 4 — UI Interface
+1. Use a new terminal, navigate to frontend directory
+
+```bash
+cd frontend/
+```
+
+2. Install dependencies and start the development server:
+
+```bash
+npm install
+npm run dev
+```
+
+3. Open your browser and navigate to http://localhost:3000.
+
+**Note on Results: Results are generated inside the results/ folder with a timestamp (e.g., results_20231025_123000). The UI automatically loads the latest directory. If you run tasks one at a time instead of in a batch, it will overwrite the latest result session, making previous single-run results inaccessible from the UI.**
 
 Folder structure full
 ```bash
